@@ -1,4 +1,9 @@
-import { isAlreadyDone, markAsDone, readDataFromSheet, writeDataToSheet } from "./googleSheets";
+import {
+  isAlreadyDone,
+  markAsDone,
+  readDataFromSheet,
+  writeDataToSheet,
+} from "./googleSheets";
 import { translateText } from "./googleTranslate";
 import dotenv from "dotenv";
 
@@ -12,19 +17,24 @@ async function processSheet() {
 
     for (const [index, row] of rows.entries()) {
       // Check if the translation is already done
-      if (!(await isAlreadyDone(index + 1))) { // Ensure the function returns a Promise
+      if (!(await isAlreadyDone(index + 1))) {
+        // Ensure the function returns a Promise
         const textToTranslate = row[0]; // Assuming the first column has the text
 
         // Translate the text
-        const translatedText = await translateText(textToTranslate, "en"); // Translate to English
+        const translatedText = await translateText(textToTranslate, "ru"); // Translate to <XX>
 
-        console.log(`Original: ${textToTranslate}, Translated: ${translatedText}`);
+        console.log(
+          `Original: ${textToTranslate}, Translated: ${translatedText}`
+        );
 
         // Write the translated text back to the sheet (in the second column, B)
         await writeDataToSheet(index + 1, translatedText ?? "not_found"); // Row index starts from 1 in Sheets API
         await markAsDone(index + 1);
       } else {
-        console.log(`Skipping row ${index + 1} as it is already marked as done.`);
+        console.log(
+          `Skipping row ${index + 1} as it is already marked as done.`
+        );
       }
     }
 

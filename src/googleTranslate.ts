@@ -55,8 +55,8 @@ export async function translateText(
 
   try {
     const res = (await translate.translations.list({
-        q: [text], // Pass text as an array
-        target: targetLanguage,
+      q: [text], // Pass text as an array
+      target: targetLanguage,
     })) as unknown as TranslationsListResponse; // Cast the response to your defined interface
 
     // Log the full response for debugging
