@@ -1,7 +1,6 @@
 import {
-  isAlreadyDone,
+  getPendingRows,
   markAsDone,
-  readDataFromSheet,
   writeDataToSheet,
 } from "./googleSheets";
 import { translateText } from "./googleTranslate";
@@ -9,33 +8,28 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Updated processSheet function using PendingRow interface
 async function processSheet() {
   try {
-    // Read data from Google Sheets (e.g., from column A)
-    const rows = await readDataFromSheet();
-    console.log(`Amount of rows: ${rows.length}`);
+    // Read pending rows (with both rowIndex and text)
+    const rows = await getPendingRows();
+    console.log(`Amount of rows to handle: ${rows.length}`);
 
-    for (const [index, row] of rows.entries()) {
-      // Check if the translation is already done
-      if (!(await isAlreadyDone(index + 1))) {
-        // Ensure the function returns a Promise
-        const textToTranslate = row[0]; // Assuming the first column has the text
+    for (const row of rows) {
+      const { rowIndex, text } = row; // Destructure rowIndex and text from each PendingRow
 
-        // Translate the text
-        const translatedText = await translateText(textToTranslate, "ru"); // Translate to <XX>
+      console.log(`Processing row: ${rowIndex}, Text: "${text}"`);
 
-        console.log(
-          `Original: ${textToTranslate}, Translated: ${translatedText}`
-        );
+      // Translate the text
+      const translatedText = await translateText(text, "ru"); // Translate to Russian (change as needed)
 
-        // Write the translated text back to the sheet (in the second column, B)
-        await writeDataToSheet(index + 1, translatedText ?? "not_found"); // Row index starts from 1 in Sheets API
-        await markAsDone(index + 1);
-      } else {
-        console.log(
-          `Skipping row ${index + 1} as it is already marked as done.`
-        );
-      }
+      console.log(`Original: ${text}, Translated: ${translatedText}`);
+
+      // Write the translated text back to the sheet (in the second column, B)
+      await writeDataToSheet(rowIndex, translatedText ?? "not_found");
+
+      // Mark the row as done in the status column (C)
+      await markAsDone(rowIndex);
     }
 
     console.log("Translation process completed.");
