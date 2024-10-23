@@ -2,10 +2,11 @@ import { google } from "googleapis";
 import { GoogleAuth } from "google-auth-library";
 import path from "path";
 import dotenv from "dotenv";
+import logger from '../logger';
 
 dotenv.config();
 
-const keyFilePath = path.join(__dirname, "../credentials/credentials.json");
+const keyFilePath = path.join(__dirname, "../../credentials/credentials.json");
 
 // Set up Google Auth
 const auth = new GoogleAuth({
@@ -32,7 +33,7 @@ interface TranslationsListResponse {
 
 // Utility function for logging
 function logResponse(response: any) {
-  console.log("API Response:", JSON.stringify(response, null, 2));
+  logger.log("API Response:", JSON.stringify(response, null, 2));
 }
 
 // Function to translate text
@@ -42,16 +43,16 @@ export async function translateText(
 ): Promise<string> {
   // Input validation
   if (typeof text !== "string" || text.trim() === "") {
-    console.error("Invalid text provided for translation.");
+    logger.error("Invalid text provided for translation.");
     return "";
   }
 
   if (typeof targetLanguage !== "string" || targetLanguage.trim() === "") {
-    console.error("Invalid target language specified.");
+    logger.error("Invalid target language specified.");
     return "";
   }
 
-  console.log(`Translating text: "${text}" to language: "${targetLanguage}"`);
+  logger.info(`Translating text: "${text}" to language: "${targetLanguage}"`);
 
   try {
     const res = (await translate.translations.list({
@@ -69,18 +70,18 @@ export async function translateText(
       res.data.data.translations.length > 0
     ) {
       const translatedText = res.data.data.translations[0].translatedText; // Access translated text
-      console.log(`Translated Text: ${translatedText}`);
+      logger.info(`Translated Text: ${translatedText}`);
       return translatedText;
     } else {
-      console.warn("No translations found in the response.");
+      logger.warn("No translations found in the response.");
       return "";
     }
   } catch (error) {
     // Improved error handling
     if (error instanceof Error) {
-      console.error(`Error during translation: ${error.message}`);
+      logger.error(`Error during translation: ${error.message}`);
     } else {
-      console.error("Unexpected error during translation:", error);
+      logger.error("Unexpected error during translation:", error);
     }
     return ""; // Return an empty string on error
   }

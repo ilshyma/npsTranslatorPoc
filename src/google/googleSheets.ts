@@ -2,13 +2,13 @@ import { google } from "googleapis";
 import { GoogleAuth } from "google-auth-library";
 import path from "path";
 import dotenv from "dotenv";
-import { sleep } from "./utils";
-import { deprecate } from "util";
-import { PendingRow } from "./PendingRow";
+import { sleep } from "../utils/utils";
+import { PendingRow } from "./models/PendingRow";
+import logger from '../logger';
 
 dotenv.config();
 
-const keyFilePath = path.join(__dirname, "../credentials/credentials.json");
+const keyFilePath = path.join(__dirname, "../../credentials/credentials.json");
 
 const auth = new GoogleAuth({
   keyFile: keyFilePath,
@@ -54,7 +54,7 @@ export async function getPendingRows(): Promise<PendingRow[]> {
 
     return pendingRows; // Return the array of pending rows with their index and text
   } catch (error) {
-    console.error("Error retrieving pending rows:", error);
+    logger.error("Error retrieving pending rows:", error);
     throw error; // Rethrow the error for handling in the caller
   }
 }
@@ -73,7 +73,7 @@ export async function readDataFromSheet() {
     await sleep(2000);
     return response.data.values || [];
   } catch (error) {
-    console.error("Error reading data from sheet:", error);
+    logger.error("Error reading data from sheet:", error);
     throw error; // Rethrow the error for handling in the caller
   }
 }
@@ -96,7 +96,7 @@ export async function isAlreadyDone(rowIndex: number): Promise<boolean> {
     await sleep();
     return statusValue === "done";
   } catch (error) {
-    console.error("Error checking status in sheet:", error);
+    logger.error("Error checking status in sheet:", error);
     throw error; // Rethrow the error for handling in the caller
   }
 }
@@ -125,8 +125,8 @@ export async function writeDataToSheet(
       },
     });
     await sleep();
-    console.log(`${columnForEdit}${rowIndex} updated with text: ${textValue}`);
+    logger.info(`${columnForEdit}${rowIndex} updated with text: ${textValue}`);
   } catch (error) {
-    console.error("Error writing data to sheet:", error);
+    logger.error("Error writing data to sheet:", error);
   }
 }

@@ -2,39 +2,44 @@ import {
   getPendingRows,
   markAsDone,
   writeDataToSheet,
-} from "./googleSheets";
-import { translateText } from "./googleTranslate";
+} from "./google/googleSheets";
+import { translateText } from "./openai/openAiTranslate";
+// import { translateText } from "./google/googleTranslateV3";
 import dotenv from "dotenv";
+import { sleep } from "./utils/utils";
+import logger from "./logger";
 
 dotenv.config();
 
-// Updated processSheet function using PendingRow interface
 async function processSheet() {
   try {
-    // Read pending rows (with both rowIndex and text)
     const rows = await getPendingRows();
-    console.log(`Amount of rows to handle: ${rows.length}`);
+    logger.info(`Amount of rows to handle: ${rows.length}`);
 
     for (const row of rows) {
-      const { rowIndex, text } = row; // Destructure rowIndex and text from each PendingRow
+      const { rowIndex, text } = row;
 
-      console.log(`Processing row: ${rowIndex}, Text: "${text}"`);
+      logger.info(`Processing row: ${rowIndex}, Text: "${text}"`);
 
-      // Translate the text
-      const translatedText = await translateText(text, "ru"); // Translate to Russian (change as needed)
+      try {
+        const translatedText = await translateText(
+          text,
+          process.env.TARGET_LANGUAGE ?? "ru"
+        );
+        logger.debug(`Original: ${text}, Translated: ${translatedText}`);
 
-      console.log(`Original: ${text}, Translated: ${translatedText}`);
+        await writeDataToSheet(rowIndex, translatedText || "not_found");
 
-      // Write the translated text back to the sheet (in the second column, B)
-      await writeDataToSheet(rowIndex, translatedText ?? "not_found");
-
-      // Mark the row as done in the status column (C)
-      await markAsDone(rowIndex);
+        await markAsDone(rowIndex);
+        logger.info(`Row ${rowIndex} marked as done.`);
+      } catch (error) {
+        logger.error(`Error translating or updating row ${rowIndex}: ${error}`);
+      }
     }
 
-    console.log("Translation process completed.");
+    logger.info("Translation process completed.");
   } catch (error) {
-    console.error("Error processing sheet:", error);
+    logger.error(`Error processing sheet: ${error}`);
   }
 }
 
