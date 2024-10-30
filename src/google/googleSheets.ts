@@ -4,7 +4,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { sleep } from "../utils/utils";
 import { PendingRow } from "./models/PendingRow";
-import logger from '../logger';
+import logger from "../logger";
 
 dotenv.config();
 
@@ -17,103 +17,96 @@ const auth = new GoogleAuth({
 
 const sheets = google.sheets({ version: "v4", auth });
 
-const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-const spreadsheetName = process.env.GOOGLE_SHEET_NAME;
-const columnForSrcText = process.env.SOURCE_COLUMN;
-const columnForTranstate = process.env.TARGET_COLUMN;
-const columnForStatus = process.env.STATUS_COLUMN;
+const spreadsheetId = process.env.GOOGLE_SHEET_ID || "";
+const spreadsheetName = process.env.GOOGLE_SHEET_NAME || "";
+const columnForSrcText = process.env.SOURCE_COLUMN || "A";
+const columnForTranstate = process.env.TARGET_COLUMN || "B";
+const columnForSentiment = process.env.SENTIMENT_COLUMN || "C";
+const columnForStatus = process.env.STATUS_COLUMN || "D";
 
-// Read data from the first column (A) and check corresponding status in column C
+// Get pending rows
 export async function getPendingRows(): Promise<PendingRow[]> {
-  const rangeA = `${spreadsheetName}!${columnForSrcText}:${columnForSrcText}`; // Column A range
-  const rangeC = `${spreadsheetName}!${columnForStatus}:${columnForStatus}`; // Column C range
+  const rangeSrcText = `${spreadsheetName}!${columnForSrcText}:${columnForSrcText}`;
+  const rangeStatus = `${spreadsheetName}!${columnForStatus}:${columnForStatus}`;
 
   try {
-    // Read values from both ranges
     const [responseA, responseC] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: rangeA,
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: rangeC,
-      }),
+      sheets.spreadsheets.values.get({ spreadsheetId, range: rangeSrcText }),
+      sheets.spreadsheets.values.get({ spreadsheetId, range: rangeStatus }),
     ]);
 
     const sourceValues = responseA.data.values || [];
     const statusValues = responseC.data.values || [];
 
-    // Filter to get only the rows where the status in column C is not "done"
     const pendingRows: PendingRow[] = sourceValues
-      .map((row, index) => ({ rowIndex: index + 1, text: row[0] })) // Add row index and text to each row
-      .filter((row, index) => {
-        const statusValue = statusValues[index]?.[0];
-        return statusValue !== "done"; // Check if status is not "done"
-      });
+      .map((row, index) => ({ rowIndex: index + 1, text: row[0] }))
+      .filter((row, index) => statusValues[index]?.[0] !== "done");
 
-    return pendingRows; // Return the array of pending rows with their index and text
+    return pendingRows;
   } catch (error) {
     logger.error("Error retrieving pending rows:", error);
-    throw error; // Rethrow the error for handling in the caller
+    throw error;
   }
 }
 
 /**
- * @deprecated
+ * Write translation and sentiment to separate columns
  */
-// Read data from the first column (A)
-export async function readDataFromSheet() {
-  const range = `${spreadsheetName}!${columnForSrcText}:${columnForSrcText}`; // Use the correct sheet name here
-  try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-    });
-    await sleep(2000);
-    return response.data.values || [];
-  } catch (error) {
-    logger.error("Error reading data from sheet:", error);
-    throw error; // Rethrow the error for handling in the caller
-  }
-}
-
-/**
- * @deprecated
- */
-export async function isAlreadyDone(rowIndex: number): Promise<boolean> {
-  const range = `${spreadsheetName}!${columnForStatus}${rowIndex}`; // Specify the range for the status column
-
-  try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-    });
-
-    const statusValue = response.data.values?.[0]?.[0]; // Get the status value from the response
-
-    // Return true if the status is "done", otherwise return false
-    await sleep();
-    return statusValue === "done";
-  } catch (error) {
-    logger.error("Error checking status in sheet:", error);
-    throw error; // Rethrow the error for handling in the caller
-  }
-}
-
-export async function markAsDone(rowIndex: number) {
-  writeDataToSheet(rowIndex, "done", columnForStatus);
-  await sleep();
-}
-
-// Write text to the column
-export async function writeDataToSheet(
+export async function writeTranslationAndSentiment(
   rowIndex: number,
-  textValue: string,
-  column?: string
+  textTranslationValue: string,
+  sentimentValue: string
 ) {
-  const columnForEdit = column ?? columnForTranstate;
-  const range = `${spreadsheetName}!${columnForEdit}${rowIndex}`; // Write to the column
+  const rangeTranslation = `${spreadsheetName}!${columnForTranstate}${rowIndex}`;
+  const rangeSentiment = `${spreadsheetName}!${columnForSentiment}${rowIndex}`;
+
+  try {
+    // Update translation column
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: rangeTranslation,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [[textTranslationValue]],
+      },
+    });
+    await sleep(500);
+    logger.info(
+      `${rangeTranslation} updated with translation: ${textTranslationValue}`
+    );
+
+    // Update sentiment column
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: rangeSentiment,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [[sentimentValue]],
+      },
+    });
+    logger.info(`${rangeSentiment} updated with sentiment: ${sentimentValue}`);
+    await sleep(500);
+  } catch (error) {
+    logger.error("Error writing translation and sentiment to sheet:", error);
+  }
+}
+
+/**
+ * Mark row as done in status column
+ */
+export async function markAsDone(rowIndex: number) {
+  await writeDataToColumn(rowIndex, "done", columnForStatus);
+}
+
+/**
+ * Write data to a specified column (single value)
+ */
+export async function writeDataToColumn(
+  rowIndex: number,
+  value: string,
+  column: string
+) {
+  const range = `${spreadsheetName}!${column}${rowIndex}`;
 
   try {
     await sheets.spreadsheets.values.update({
@@ -121,12 +114,12 @@ export async function writeDataToSheet(
       range,
       valueInputOption: "RAW",
       requestBody: {
-        values: [[textValue]],
+        values: [[value]],
       },
     });
+    logger.info(`${range} updated with value: ${value}`);
     await sleep();
-    logger.info(`${columnForEdit}${rowIndex} updated with text: ${textValue}`);
   } catch (error) {
-    logger.error("Error writing data to sheet:", error);
+    logger.error("Error writing data to column:", error);
   }
 }

@@ -1,9 +1,9 @@
 import {
   getPendingRows,
   markAsDone,
-  writeDataToSheet,
+  writeTranslationAndSentiment,
 } from "./google/googleSheets";
-import { translateText } from "./openai/openAiTranslate";
+import { translateAndAnalyzeText } from "./openai/openAiTranslate";
 // import { translateText } from "./google/googleTranslateV3";
 import dotenv from "dotenv";
 import { sleep } from "./utils/utils";
@@ -22,13 +22,23 @@ async function processSheet() {
       logger.info(`Processing row: ${rowIndex}, Text: "${text}"`);
 
       try {
-        const translatedText = await translateText(
+        // Call the new translation function that also performs sentiment analysis
+        const { translatedText, sentiment } = await translateAndAnalyzeText(
           text,
-          process.env.TARGET_LANGUAGE ?? "ru"
+          process.env.TARGET_LANGUAGE ?? "ru",
+          process.env.SOURCE_LANGUAGE ?? "az"
         );
-        logger.debug(`Original: ${text}, Translated: ${translatedText}`);
 
-        await writeDataToSheet(rowIndex, translatedText || "not_found");
+        logger.debug(
+          `Original: ${text}, Translated: ${translatedText}, Sentiment: ${sentiment}`
+        );
+
+        // Write the translated text and optionally the sentiment to the sheet
+        await writeTranslationAndSentiment(
+          rowIndex,
+          translatedText || "not_found",
+          sentiment || "unknown"
+        );
 
         await markAsDone(rowIndex);
         logger.info(`Row ${rowIndex} marked as done.`);
